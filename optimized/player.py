@@ -40,10 +40,10 @@ class Player(Bot):
 
         # If the community cards are not empty, we need to remove them from the deck
         # because we don't want to draw them again in the MC
-        # if community != []:
-        #     community_cards = [eval7.Card(card) for card in community]
-        #     for card in community_cards: #removing the current community cards from the deck
-        #         deck.cards.remove(card)
+        if community != []:
+            community_cards = [eval7.Card(card) for card in community]
+            for card in community_cards: #removing the current community cards from the deck
+                deck.cards.remove(card)
 
         for card in hole_cards: #removing our hole cards from the deck
             deck.cards.remove(card)
@@ -72,13 +72,13 @@ class Player(Bot):
             alt_community = draw[_OPP:] # the community cards that we draw in the MC
 
             
-            # if community == []: # if there are no community cards, we only need to compare our hand to the opp hand
-            #     our_hand = hole_cards  + alt_community 
-            #     opp_hand = opp_hole  + alt_community
-            # else: 
+            if community == []: # if there are no community cards, we only need to compare our hand to the opp hand
+                our_hand = hole_cards  + alt_community 
+                opp_hand = opp_hole  + alt_community
+            else: 
 
-            #     our_hand = hole_cards + community_cards + alt_community
-            #     opp_hand = opp_hole + community_cards + alt_community
+                our_hand = hole_cards + community_cards + alt_community
+                opp_hand = opp_hole + community_cards + alt_community
 
 
             our_hand_value = eval7.evaluate(our_hand)
@@ -169,8 +169,8 @@ class Player(Bot):
             raise_amount = int(my_pip + continue_cost + 0.75*(pot_total + continue_cost))
 
         # # ensure raises are legal
-        # raise_amount = max([min_raise, raise_amount]) #getting the max of the min raise and the raise amount
-        # raise_amount = min([max_raise, raise_amount]) #getting the min of the max raise and the raise amount
+        raise_amount = max([min_raise, raise_amount]) #getting the max of the min raise and the raise amount
+        raise_amount = min([max_raise, raise_amount]) #getting the min of the max raise and the raise amount
         # # we want to do this so that we don't raise more than the max raise or less than the min raise
 
         if (RaiseAction in legal_actions and (raise_amount <= my_stack)):
@@ -185,10 +185,10 @@ class Player(Bot):
         _MONTE_CARLO_ITERS = 100
         
         #running monte carlo simulation when we have community cards vs when we don't 
-        # if street <3:
-        #     strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS)
-        # else:
-        #     strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS, board_cards)
+        if street <3:
+            strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS)
+        else:
+            strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS, board_cards)
 
         
 
