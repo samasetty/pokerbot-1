@@ -28,11 +28,10 @@ class Player(Bot):
         '''
         pass
 
-
     def calc_strength(self, hole, iterations):
         '''
-        
-        
+
+
         '''
 
         deck = eval7.Deck()
@@ -54,15 +53,15 @@ class Player(Bot):
             opp_hole = draw[:_OPP]
             community = draw[_OPP:]
 
-            our_hand = hole_card +  community
-            opp_hand = opp_hole +  community
+            our_hand = hole_card + community
+            opp_hand = opp_hole + community
 
             our_value = eval7.evaluate(our_hand)
             opp_value = eval7.evaluate(opp_hand)
 
             if our_value > opp_value:
                 score += 2
-            
+
             elif our_value == opp_value:
                 score += 1
 
@@ -72,7 +71,6 @@ class Player(Bot):
         hand_strength = score / (2 * iterations)
 
         return hand_strength
-
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -87,11 +85,11 @@ class Player(Bot):
         Nothing.
         '''
         my_bankroll = game_state.bankroll  # the total number of chips you've gained or lost from the beginning of the game to the start of this round
-        game_clock = game_state.game_clock  # the total number of seconds your bot has left to play this game
+        # the total number of seconds your bot has left to play this game
+        game_clock = game_state.game_clock
         round_num = game_state.round_num  # the round number from 1 to NUM_ROUNDS
         my_cards = round_state.hands[active]  # your cards
         big_blind = bool(active)  # True if you are the big blind
-        
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -109,8 +107,8 @@ class Player(Bot):
         previous_state = terminal_state.previous_state  # RoundState before payoffs
         street = previous_state.street  # int of street representing when this round ended
         my_cards = previous_state.hands[active]  # your cards
-        opp_cards = previous_state.hands[1-active]  # opponent's cards or [] if not revealed
-        
+        # opponent's cards or [] if not revealed
+        opp_cards = previous_state.hands[1-active]
 
     def get_action(self, game_state, round_state, active):
         '''
@@ -126,36 +124,40 @@ class Player(Bot):
         Your action.
         '''
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
-        street = round_state.street  # int representing pre-flop, flop, turn, or river respectively
+        # int representing pre-flop, flop, turn, or river respectively
+        street = round_state.street
         my_cards = round_state.hands[active]  # your cards
         board_cards = round_state.deck[:street]  # the board cards
-        my_pip = round_state.pips[active]  # the number of chips you have contributed to the pot this round of betting
-        opp_pip = round_state.pips[1-active]  # the number of chips your opponent has contributed to the pot this round of betting
-        my_stack = round_state.stacks[active]  # the number of chips you have remaining
-        opp_stack = round_state.stacks[1-active]  # the number of chips your opponent has remaining
+        # the number of chips you have contributed to the pot this round of betting
+        my_pip = round_state.pips[active]
+        # the number of chips your opponent has contributed to the pot this round of betting
+        opp_pip = round_state.pips[1-active]
+        # the number of chips you have remaining
+        my_stack = round_state.stacks[active]
+        # the number of chips your opponent has remaining
+        opp_stack = round_state.stacks[1-active]
         continue_cost = opp_pip - my_pip  # the number of chips needed to stay in the pot
-        my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
-        opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
-        
-        
+        # the number of chips you have contributed to the pot
+        my_contribution = STARTING_STACK - my_stack
+        # the number of chips your opponent has contributed to the pot
+        opp_contribution = STARTING_STACK - opp_stack
 
-        
-        min_raise, max_raise = round_state.raise_bounds()  # the smallest and largest numbers of chips for a legal bet/raise
+        # the smallest and largest numbers of chips for a legal bet/raise
+        min_raise, max_raise = round_state.raise_bounds()
         my_action = None
-
 
         pot_total = my_contribution + opp_contribution
 
         if street < 3:
-            raise_amount = int(my_pip + continue_cost + 0.4 * (pot_total + continue_cost))
+            raise_amount = int(my_pip + continue_cost +
+                               0.4 * (pot_total + continue_cost))
         else:
-            raise_amount = int(my_pip + continue_cost + 0.75 * (pot_total + continue_cost))
+            raise_amount = int(my_pip + continue_cost +
+                               0.75 * (pot_total + continue_cost))
 
-        
         raise_amount = max([min_raise, raise_amount])
 
         raise_cost = raise_amount - my_pip
-
 
         if (RaiseAction in legal_actions and (raise_cost <= my_stack)):
             temp_action = RaiseAction(raise_amount)
@@ -163,19 +165,17 @@ class Player(Bot):
         elif (CallAction in legal_actions and (continue_cost <= my_stack)):
             temp_action = CallAction()
 
-        elif CheckAction in legal_actions: 
+        elif CheckAction in legal_actions:
             temp_action = CheckAction()
         else:
             temp_action = FoldAction()
 
-
         MONTE_CARLO_ITERS = 100
         strength = self.calc_strength(my_cards, MONTE_CARLO_ITERS)
 
-
         if continue_cost > 0:
             scary = 0
-            
+
             if continue_cost > 6:
                 scary = 0.15
             if continue_cost > 12:
@@ -204,8 +204,10 @@ class Player(Bot):
             else:
                 my_action = CheckAction()
 
-        return my_action 
+        return my_action
 
 
 if __name__ == '__main__':
-    run_bot(Player(), parse_args())
+    deck = eval7.Deck()
+    print(str(deck.deal(2)[0]))
+    # run_bot(Player(), parse_args())

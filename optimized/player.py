@@ -7,8 +7,50 @@ from skeleton.states import NUM_ROUNDS, STARTING_STACK, BIG_BLIND, SMALL_BLIND
 from skeleton.bot import Bot
 from skeleton.runner import parse_args, run_bot
 
-import random 
+import random
 import eval7
+
+buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
+           2: {"TTo", "AQs", "AJs", "KQs", "AKo"},
+           3: {"99o", "ATs", "KJs", "QJs", "JTs", "AQo"},
+           4: {"88o", "KTs", "QTs", "J9s", "T9s", "98s", "AJo", "KQo"},
+           5: {"77o", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s", "Q9s", "T8s", "97s", "87s", "76s", "KJo", "QJo", "JTo"},
+           6: {"66o", "55o", "K9s", "J8s", "86s", "75s", "54s", "ATo", "KTo", "QTo"},
+           7: {"44o", "33o", "22o", "K8s", "K7s", "K6s", "K5s", "K4s", "K3s", "K2s", "Q8s", "T7s", "64s", "53s", "43s", "J9o", "T9o", "98o"},
+           8: {"J7s", "96s", "85s", "74s", "42s", "32s", "A9o", "K9o", "Q9o", "J8o", "T8o", "87o", "76o", "65o", "54o"}
+           }
+# 1: 14
+# 2: 15
+# 3: 17
+# 4: 25
+# 5: 47
+# 6: 34
+# 7: 51
+# 8: 66
+# 9: 394
+
+
+def parse_hold(hole):
+    '''parse hole card into bucket
+    return bucket int'''
+    '''hole = ['Ks', 'Kh]'''
+    cards = []
+    for c in hole:
+        cards.append(str(c))
+
+    suited = "o"
+    if cards[0][1] == cards[1][1]:
+        suited = "s"
+
+    pair = [cards[0][0] + cards[1][0] + suited,
+            cards[1][0] + cards[0][0] + suited]
+
+    bucket = 9
+    for k in buckets.keys():
+        for p in pair:
+            if p in buckets[k]:
+                bucket = k
+    return bucket
 
 
 class Player(Bot):
@@ -24,8 +66,8 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
-        
-    def calc_strength(self, hole, iters, community = []):
+
+    def calc_strength(self, hole, iters, community=[]):
         ''' 
         Using MC with iterations to evalute hand strength 
         Args: 
@@ -34,68 +76,67 @@ class Player(Bot):
         community - community cards
         '''
 
-        deck = eval7.Deck() # deck of cards
-        hole_cards = [eval7.Card(card) for card in hole] # our hole cards in eval7 friendly format
-
+        deck = eval7.Deck()  # deck of cards
+        # our hole cards in eval7 friendly format
+        hole_cards = [eval7.Card(card) for card in hole]
 
         # If the community cards are not empty, we need to remove them from the deck
         # because we don't want to draw them again in the MC
         if community != []:
             community_cards = [eval7.Card(card) for card in community]
-            for card in community_cards: #removing the current community cards from the deck
+            for card in community_cards:  # removing the current community cards from the deck
                 deck.cards.remove(card)
 
-        for card in hole_cards: #removing our hole cards from the deck
+        for card in hole_cards:  # removing our hole cards from the deck
             deck.cards.remove(card)
-        
-        #the score is the number of times we win, tie, or lose
-        score = 0 
 
-        for _ in range(iters): # MC the probability of winning
+        # the score is the number of times we win, tie, or lose
+        score = 0
+
+        for _ in range(iters):  # MC the probability of winning
             deck.shuffle()
 
-            #Let's see how many community cards we still need to draw
-            if len(community) >= 5: #red river case
-                #check the last community card to see if it is red
+            # Let's see how many community cards we still need to draw
+            if len(community) >= 5:  # red river case
+                # check the last community card to see if it is red
                 if community[-1][1] == 'h' or community[-1][1] == 'd':
                     _COMM = 1
                 else:
                     _COMM = 0
             else:
-                _COMM = 5 - len(community) # number of community cards we need to draw 
+                # number of community cards we need to draw
+                _COMM = 5 - len(community)
 
-            _OPP = 2 
+            _OPP = 2
 
-            draw = deck.peek(_COMM + _OPP)  
-            
+            draw = deck.peek(_COMM + _OPP)
+
             opp_hole = draw[:_OPP]
-            alt_community = draw[_OPP:] # the community cards that we draw in the MC
+            # the community cards that we draw in the MC
+            alt_community = draw[_OPP:]
 
-            
-            if community == []: # if there are no community cards, we only need to compare our hand to the opp hand
-                our_hand = hole_cards  + alt_community 
-                opp_hand = opp_hole  + alt_community
-            else: 
+            if community == []:  # if there are no community cards, we only need to compare our hand to the opp hand
+                our_hand = hole_cards + alt_community
+                opp_hand = opp_hole + alt_community
+            else:
 
                 our_hand = hole_cards + community_cards + alt_community
                 opp_hand = opp_hole + community_cards + alt_community
-
 
             our_hand_value = eval7.evaluate(our_hand)
             opp_hand_value = eval7.evaluate(opp_hand)
 
             if our_hand_value > opp_hand_value:
-                score += 2 
+                score += 2
 
             if our_hand_value == opp_hand_value:
-                score += 1 
-            else: 
-                score += 0        
+                score += 1
+            else:
+                score += 0
 
-        hand_strength = score/(2*iters) # win probability 
+        hand_strength = score/(2*iters)  # win probability
 
         return hand_strength
-    
 
     def handle_new_round(self, game_state, round_state, active):
         '''
@@ -108,11 +149,11 @@ class Player(Bot):
         Nothing.
         '''
         my_bankroll = game_state.bankroll  # the total number of chips you've gained or lost from the beginning of the game to the start of this round
-        game_clock = game_state.game_clock  # the total number of seconds your bot has left to play this game
+        # the total number of seconds your bot has left to play this game
+        game_clock = game_state.game_clock
         round_num = game_state.round_num  # the round number from 1 to NUM_ROUNDS
         my_cards = round_state.hands[active]  # your cards
         big_blind = bool(active)  # True if you are the big blind
-
 
     def handle_round_over(self, game_state, terminal_state, active):
         '''
@@ -128,8 +169,8 @@ class Player(Bot):
         previous_state = terminal_state.previous_state  # RoundState before payoffs
         street = previous_state.street  # 0, 3, 4, or 5 representing when this round ended
         my_cards = previous_state.hands[active]  # your cards
-        opp_cards = previous_state.hands[1-active]  # opponent's cards or [] if not revealed
-        
+        # opponent's cards or [] if not revealed
+        opp_cards = previous_state.hands[1-active]
 
     def get_action(self, game_state, round_state, active):
         '''
@@ -143,34 +184,44 @@ class Player(Bot):
         Your action.
         '''
         legal_actions = round_state.legal_actions()  # the actions you are allowed to take
-        street = round_state.street  # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
+        # 0, 3, 4, or 5 representing pre-flop, flop, turn, or river respectively
+        street = round_state.street
         my_cards = round_state.hands[active]  # your cards
         board_cards = round_state.deck[:street]  # the board cards
-        my_pip = round_state.pips[active]  # the number of chips you have contributed to the pot this round of betting
-        opp_pip = round_state.pips[1-active]  # the number of chips your opponent has contributed to the pot this round of betting
-        my_stack = round_state.stacks[active]  # the number of chips you have remaining
-        opp_stack = round_state.stacks[1-active]  # the number of chips your opponent has remaining
+        # the number of chips you have contributed to the pot this round of betting
+        my_pip = round_state.pips[active]
+        # the number of chips your opponent has contributed to the pot this round of betting
+        opp_pip = round_state.pips[1-active]
+        # the number of chips you have remaining
+        my_stack = round_state.stacks[active]
+        # the number of chips your opponent has remaining
+        opp_stack = round_state.stacks[1-active]
         continue_cost = opp_pip - my_pip  # the number of chips needed to stay in the pot
-        my_contribution = STARTING_STACK - my_stack  # the number of chips you have contributed to the pot
-        opp_contribution = STARTING_STACK - opp_stack  # the number of chips your opponent has contributed to the pot
+        # the number of chips you have contributed to the pot
+        my_contribution = STARTING_STACK - my_stack
+        # the number of chips your opponent has contributed to the pot
+        opp_contribution = STARTING_STACK - opp_stack
         net_upper_raise_bound = round_state.raise_bounds()
-        stacks = [my_stack, opp_stack] #keep track of our stacks
+        stacks = [my_stack, opp_stack]  # keep track of our stacks
 
         my_action = None
 
         min_raise, max_raise = round_state.raise_bounds()
         pot_total = my_contribution + opp_contribution
 
-
-        # raise logic 
-        if street <3: #preflop 
-            raise_amount = int(my_pip + continue_cost + 0.4*(pot_total + continue_cost))
-        else: #postflop
-            raise_amount = int(my_pip + continue_cost + 0.75*(pot_total + continue_cost))
+        # raise logic
+        if street < 3:  # preflop
+            raise_amount = int(my_pip + continue_cost +
+                               0.4*(pot_total + continue_cost))
+        else:  # postflop
+            raise_amount = int(my_pip + continue_cost +
+                               0.75*(pot_total + continue_cost))
 
         # # ensure raises are legal
-        raise_amount = max([min_raise, raise_amount]) #getting the max of the min raise and the raise amount
-        raise_amount = min([max_raise, raise_amount]) #getting the min of the max raise and the raise amount
+        # getting the max of the min raise and the raise amount
+        raise_amount = max([min_raise, raise_amount])
+        # getting the min of the max raise and the raise amount
+        raise_amount = min([max_raise, raise_amount])
         # # we want to do this so that we don't raise more than the max raise or less than the min raise
 
         if (RaiseAction in legal_actions and (raise_amount <= my_stack)):
@@ -180,49 +231,54 @@ class Player(Bot):
         elif CheckAction in legal_actions:
             temp_action = CheckAction()
         else:
-            temp_action = FoldAction() 
+            temp_action = FoldAction()
 
         _MONTE_CARLO_ITERS = 100
-        
-        #running monte carlo simulation when we have community cards vs when we don't 
-        if street <3:
+
+        # running monte carlo simulation when we have community cards vs when we don't
+        if street < 3:
             strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS)
         else:
-            strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS, board_cards)
+            strength = self.calc_strength(
+                my_cards, _MONTE_CARLO_ITERS, board_cards)
 
-        
-
-        if continue_cost > 0: 
+        if continue_cost > 0:
             _SCARY = 0
             if continue_cost > 6:
                 _SCARY = 0.1
-            if continue_cost > 15: 
+            if continue_cost > 15:
                 _SCARY = .2
-            if continue_cost > 50: 
+            if continue_cost > 50:
                 _SCARY = 0.35
 
             strength = max(0, strength - _SCARY)
             pot_odds = continue_cost/(pot_total + continue_cost)
 
-            if strength >= pot_odds: # nonnegative EV decision
-                if strength > 0.5 and random.random() < strength: 
+            if strength >= pot_odds:  # nonnegative EV decision
+                if strength > 0.5 and random.random() < strength:
                     my_action = temp_action
-                else: 
+                else:
                     my_action = CallAction()
-            
-            else: #negative EV
+
+            else:  # negative EV
                 my_action = FoldAction()
-                
-        else: # continue cost is 0  
-            if random.random() < strength: 
+
+        else:  # continue cost is 0
+            if random.random() < strength:
                 my_action = temp_action
-            else: 
+            else:
                 my_action = CheckAction()
-            
 
         return my_action
-        
 
 
 if __name__ == '__main__':
-    run_bot(Player(), parse_args())
+    deck = eval7.Deck()
+    deck.shuffle()
+    hole = deck.deal(2)
+    hole2 = [eval7.Card('7s'), eval7.Card('8h')]
+    print(hole2)
+    # print(hole)
+    print(parse_hold(hole2))
+
+    # run_bot(Player(), parse_args())
