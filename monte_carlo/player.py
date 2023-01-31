@@ -210,4 +210,4 @@ class Player(Bot):
 if __name__ == '__main__':
     deck = eval7.Deck()
     print(str(deck.deal(2)[0]))
-    # run_bot(Player(), parse_args())
+    run_bot(Player(), parse_args())

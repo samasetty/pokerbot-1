@@ -9,7 +9,9 @@ from skeleton.runner import parse_args, run_bot
 
 import random
 import eval7
+import itertools
 
+#strongest to weakest buckets according to standard 
 buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
            2: {"TTo", "AQs", "AJs", "KQs", "AKo"},
            3: {"99o", "ATs", "KJs", "QJs", "JTs", "AQo"},
@@ -17,11 +19,13 @@ buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
            5: {"77o", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s", "Q9s", "T8s", "97s", "87s", "76s", "KJo", "QJo", "JTo"},
            6: {"66o", "55o", "K9s", "J8s", "86s", "75s", "54s", "ATo", "KTo", "QTo"},
            7: {"44o", "33o", "22o", "K8s", "K7s", "K6s", "K5s", "K4s", "K3s", "K2s", "Q8s", "T7s", "64s", "53s", "43s", "J9o", "T9o", "98o"},
-           8: {"J7s", "96s", "85s", "74s", "42s", "32s", "A9o", "K9o", "Q9o", "J8o", "T8o", "87o", "76o", "65o", "54o"}
+           8: {"J7s", "96s", "85s", "74s", "42s", "32s", "A9o", "K9o", "Q9o", "J8o", "T8o", "87o", "76o", "65o", "54o"},
+           9: {'A3o', '53o', 'T5s', '83o', 'K3o', '63s', '97o', 'J5o', '95o', 'Q3o', 'A8o', 'J4o', 'J3s', 'T5o', 'Q4o', 'K4o', '73o', 'K6o', 'T4s', 'T4o', '95s', '94o', 'T2s', 'J7o', 'Q5o', '96o', 'A4o', 'J3o', 'Q6o', 'Q7o', '52s', '83s', '92s', 'A6o', '82s', 'J6s', '64o', 'K2o', '93s', 'A5o', '62s', 'K5o', '72o', '63o', '72s', '52o', '73s', '92o', 'T7o', '75o', 'Q8o', '82o', 'T3s', '84s', 'T2o', 'J2s', '85o', 'A7o', 'J2o', '74o', 'Q5s', 'Q4s', 'Q6s', '62o', 'A2o', 'Q2s', '86o', 'J6o', 'J4s', 'T3o', 'T6s', '94s', 'T6o', '84o', 'Q7s', '43o', '32o', 'K8o', 'J5s', 'Q2o', '93o', 'Q3s', '65s', '42o', 'K7o'}
            }
-# 1: 14
-# 2: 15
-# 3: 17
+#probabilities of a random hand being in each bucket
+# 1: 14/663
+# 2: 15/663
+# 3: 17/663
 # 4: 25
 # 5: 47
 # 6: 34
@@ -29,11 +33,10 @@ buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
 # 8: 66
 # 9: 394
 
-
 def parse_hold(hole):
-    '''parse hole card into bucket
-    return bucket int'''
-    '''hole = ['Ks', 'Kh]'''
+    '''
+    parses given hole cards into buckets
+    return bucket key'''
     cards = []
     for c in hole:
         cards.append(str(c))
@@ -52,6 +55,121 @@ def parse_hold(hole):
                 bucket = k
     return bucket
 
+def generate_set(key):
+    '''generates all 2 hand combos from those given in U_key'''
+    #variable inits
+    in_bounds = set()
+    suits = {'c', 'd', 'h', 's'}
+    opp = {('c','d'), ('c', 'h'), ('c','s'), ('d', 'c'), ('d', 'h'), ('d','s'), ('h','c'), ('h','d'), ('h','s'), ('s', 'c'), ('s','d'), ('s','h')}
+    pairs = list(itertools.combinations(suits, 2))
+    card_combos = buckets[key]
+
+    #actual code
+    for card in card_combos:
+        num1, num2, o_or_s = card[0], card[1], card[2]
+        if num1 == num2:
+            for pair in pairs: #pairs, 6 
+                in_bounds.add((eval7.Card(num1+pair[0]), eval7.Card(num2+pair[1])))
+        else:
+            if o_or_s == "s":
+                for suit in suits: #suited, 4
+                    in_bounds.add((eval7.Card(num1+suit), eval7.Card(num2+suit)))
+            else: 
+                for tup in opp: #opposite, 12
+                    in_bounds.add((eval7.Card(num1+tup[0]), eval7.Card(num2+tup[1])))
+    return in_bounds
+
+def assignTopPair(hole, community):
+    '''
+    from yesterday's pdf
+
+    if called, alters the opponents hold cards 
+    by assigning the best pair that can be created with given community cards
+
+    if no such pair exists because all cards of max rank, e.x. Ace, are already in community/our hand, returns None
+
+    similar parameters to calc_strenght function, ex.
+    hole = ['2d', 'Th']
+    community = ['4c', '5s', 'Kc']
+    '''
+    deck = eval7.Deck()
+    hole_cards = [eval7.Card(card) for card in hole]
+    community_cards = [eval7.Card(card) for card in community]
+    remove_cards = hole_cards + community_cards
+    for card in remove_cards:
+        deck.cards.remove(card) #remove hole and community cards 
+
+    #find highest community card
+    hash = {'2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, 'T':10, 'J':11, 'Q':12, 'K':13, 'A':14}
+    max_rank = ('2', 2)
+    for c in community:
+        rank = c[0]
+        if hash[rank] > max_rank[1]:
+            max_rank = (rank, hash[rank])
+    print(max_rank)
+    
+    #tries to assign hole card 
+    new_opp_hand = None
+    suits = {'c', 'd', 'h', 's'} #NOTE assigns hole card in this order, so not entirely random
+    for suit in suits:
+        card = max_rank[0] + suit
+        if eval7.Card(card) in deck: #if one exists, create new hand
+            new_opp_hand = []
+            new_opp_hand.append(card) #max rank
+            deck.cards.remove(eval7.Card(card))
+            deck.shuffle()
+            new_opp_hand.append(str(deck[0])) #random card
+            break
+    return new_opp_hand
+
+def assignNutCard(hole, community):
+    '''
+    from yesterday's pdf
+
+    if called, alters the opponents hold cards 
+    by assigning the best nuts that can be created with given community cards
+
+    similar parameters to calc_strenght function, ex.
+    hole = ['2d', 'Th']
+    community = ['4c', '5s', 'Kc']
+    NOTE: I have code for flop community and non-flop (>3 cards). When flop, the code considers best 5 hand combo
+    of 2 hole and 3 flop
+    When non-flop, the code considers best 5 hand combo of 1 hole and 4 community cards
+    Because the pdf paper only consider one hole card but for flop round, idk what to do (there wouldn't be 5 cards)
+    '''
+    deck = eval7.Deck()
+    hole_cards = [eval7.Card(card) for card in hole]
+    community_cards = [eval7.Card(card) for card in community]
+    remove_cards = hole_cards + community_cards
+    for card in remove_cards:
+        deck.cards.remove(card) #remove hole and community cards 
+
+    best_nuts = (None, 0)
+
+    if len(community) == 3: #flop
+        possible_holes = list(itertools.combinations(deck, 2))
+        possible_communities = list(itertools.combinations(community_cards, 3))
+        for hole in possible_holes:
+            for rest in possible_communities:
+                if eval7.evaluate(hole+rest) > best_nuts[1]:
+                    best_nuts = ([str(hole[0]), str(hole[1])], eval7.evaluate(hole+rest))
+    else:
+        possible_communities = list(itertools.combinations(community_cards, 4))
+        # if len(possible_communities) > 500: #trying to limit the time
+        #     possible_communities = possible_communities[:500]
+        for opp_hole_card in deck: #50ish
+            for rest in possible_communities: #1000ish
+                if eval7.evaluate([opp_hole_card]+list(rest)) > best_nuts[1]:
+                    print("HERE")
+                    second_hole = None
+                    while not second_hole:
+                        deck.shuffle()
+                        this = deck.deal(1)[0]
+                        if this != opp_hole_card:
+                            second_hole = this
+                    print([opp_hole_card]+list(rest)) #best hand
+                    best_nuts = ([str(opp_hole_card), str(second_hole)], eval7.evaluate([opp_hole_card]+list(rest)))
+    return best_nuts
 
 class Player(Bot):
     '''
@@ -273,12 +391,40 @@ class Player(Bot):
 
 
 if __name__ == '__main__':
+    # run_bot(Player(), parse_args()) 
+    #UNCOMMENT ABOVE TO RUN ENGINE 
+    #____________________________________________________
+
     deck = eval7.Deck()
     deck.shuffle()
-    hole = deck.deal(2)
-    hole2 = [eval7.Card('7s'), eval7.Card('8h')]
-    print(hole2)
-    # print(hole)
-    print(parse_hold(hole2))
 
-    # run_bot(Player(), parse_args())
+    # #Test Parse_hold
+    # hole = deck.deal(2)
+    # hole2 = [eval7.Card('7s'), eval7.Card('8h')]
+    # print(hole2)
+    # # print(hole)
+    # print(parse_hold(hole2))
+
+    #Test assignTopPair
+    cards = deck.deal(2+3)
+    hole = cards[:2]
+    flop = cards[2:]
+    print(hole, flop)
+    print(assignTopPair(['5s','Ac'], ['Td','Th','Ts']))
+
+    #Test Nut
+    print(assignNutCard(['5s','Ac'], ['8h','6h','Tc', 'Ah','8s','2c','7c']))
+
+    # #Test Generate_set
+    # count = 0
+    # for i in range(1, 10):
+    #     print(i, len(generate_set(i)))
+    #     count += len(generate_set(i))
+    # print(count) #should be 1326
+
+    # #Test Buckets
+    # count = 0
+    # for i in buckets:
+    #     count += len(buckets[i])
+    # print(count) #should be 169
+
