@@ -35,8 +35,12 @@ buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
 
 def parse_hold(hole):
     '''
+    input: [eval7.Card('2s'), eval7.Card('7c')]
+
     parses given hole cards into buckets
-    return bucket key'''
+    return bucket key
+    used to find which bucket a given card is in
+    '''
     cards = []
     for c in hole:
         cards.append(str(c))
@@ -56,7 +60,12 @@ def parse_hold(hole):
     return bucket
 
 def generate_set(key):
-    '''generates all 2 hand combos from those given in U_key'''
+    '''
+    input: integer from 1 to 9
+    generates all 2 hand combos from those given in U_key
+    this function is used to narrow the hole card ranges for opponent for the MONTE CARLO simulations
+    in preflop
+    '''
     #variable inits
     in_bounds = set()
     suits = {'c', 'd', 'h', 's'}
