@@ -128,7 +128,7 @@ def assignTopPair(hole, community):
     # tries to assign hole card
     new_opp_hand = None
     suits = ['c', 'd', 'h', 's']
-    while True:
+    while not suits:
         suitIndex = random.randint(0, len(suits) - 1)
         suit = suits[suitIndex]
         suits.pop(suitIndex)
@@ -512,7 +512,7 @@ if __name__ == '__main__':
     hole = cards[:2]
     flop = cards[2:]
     print(hole, flop)
-    print(assignTopPair(['5s', 'Ac'], ['Td', 'Th', 'Ts']))
+    print(assignTopPair(['5s', 'Ac'], ['Tc','Td', 'Th', 'Ts']))
 
     # #Test Nut
     # print(assignNutCard(['5s','Ac'], ['8h','6h','Tc', 'Ah','8s','2c','7c']))
