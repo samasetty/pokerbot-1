@@ -1,0 +1,15 @@
+set()
+Traceback (most recent call last):
+  File "/Users/sama/pokerbot-1/optimized/player.py", line 638, in <module>
+    run_bot(Player(), parse_args())
+  File "/Users/sama/pokerbot-1/optimized/skeleton/runner.py", line 130, in run_bot
+    runner.run()
+  File "/Users/sama/pokerbot-1/optimized/skeleton/runner.py", line 105, in run
+    action = self.pokerbot.get_action(game_state, round_state, active)
+  File "/Users/sama/pokerbot-1/optimized/player.py", line 590, in get_action
+    strength = self.calc_strength_pre_flop(my_cards, _MONTE_CARLO_ITERS, 0)
+  File "/Users/sama/pokerbot-1/optimized/player.py", line 275, in calc_strength_pre_flop
+    opp_hole = random.choice(list(possible_holes))
+  File "/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/random.py", line 378, in choice
+    return seq[self._randbelow(len(seq))]
+IndexError: list index out of range

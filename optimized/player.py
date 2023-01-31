@@ -9,7 +9,179 @@ from skeleton.runner import parse_args, run_bot
 
 import random 
 import eval7
+import itertools
 
+# strongest to weakest buckets according to standard
+buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
+           2: {"TTo", "AQs", "AJs", "KQs", "AKo"},
+           3: {"99o", "ATs", "KJs", "QJs", "JTs", "AQo"},
+           4: {"88o", "KTs", "QTs", "J9s", "T9s", "98s", "AJo", "KQo"},
+           5: {"77o", "A9s", "A8s", "A7s", "A6s", "A5s", "A4s", "A3s", "A2s", "Q9s", "T8s", "97s", "87s", "76s", "KJo", "QJo", "JTo"},
+           6: {"66o", "55o", "K9s", "J8s", "86s", "75s", "54s", "ATo", "KTo", "QTo"},
+           7: {"44o", "33o", "22o", "K8s", "K7s", "K6s", "K5s", "K4s", "K3s", "K2s", "Q8s", "T7s", "64s", "53s", "43s", "J9o", "T9o", "98o"},
+           8: {"J7s", "96s", "85s", "74s", "42s", "32s", "A9o", "K9o", "Q9o", "J8o", "T8o", "87o", "76o", "65o", "54o"},
+           9: {'A3o', '53o', 'T5s', '83o', 'K3o', '63s', '97o', 'J5o', '95o', 'Q3o', 'A8o', 'J4o', 'J3s', 'T5o', 'Q4o', 'K4o', '73o', 'K6o', 'T4s', 'T4o', '95s', '94o', 'T2s', 'J7o', 'Q5o', '96o', 'A4o', 'J3o', 'Q6o', 'Q7o', '52s', '83s', '92s', 'A6o', '82s', 'J6s', '64o', 'K2o', '93s', 'A5o', '62s', 'K5o', '72o', '63o', '72s', '52o', '73s', '92o', 'T7o', '75o', 'Q8o', '82o', 'T3s', '84s', 'T2o', 'J2s', '85o', 'A7o', 'J2o', '74o', 'Q5s', 'Q4s', 'Q6s', '62o', 'A2o', 'Q2s', '86o', 'J6o', 'J4s', 'T3o', 'T6s', '94s', 'T6o', '84o', 'Q7s', '43o', '32o', 'K8o', 'J5s', 'Q2o', '93o', 'Q3s', '65s', '42o', 'K7o'}
+           }
+probabilities = [0,
+                 14/663,
+                 15/663,
+                 17/663,
+                 25/663,
+                 47/663,
+                 34/663,
+                 51/663,
+                 66/663,
+                 394/663]
+
+def parse_hold(hole):
+    '''
+    input: [eval7.Card('2s'), eval7.Card('7c')]
+    parses given hole cards into buckets
+    return bucket key
+    used to find which bucket a given card is in
+    '''
+    cards = []
+    for c in hole:
+        cards.append(str(c))
+
+    suited = "o"
+    if cards[0][1] == cards[1][1]:
+        suited = "s"
+
+    pair = [cards[0][0] + cards[1][0] + suited,
+            cards[1][0] + cards[0][0] + suited]
+
+    bucket = 9
+    for k in buckets.keys():
+        for p in pair:
+            if p in buckets[k]:
+                bucket = k
+    return bucket
+
+def generate_set(key):
+    '''
+    input: integer from 1 to 9
+    generates all 2 hand combos from those given in U_key
+    this function is used to narrow the hole card ranges for opponent for the MONTE CARLO simulations
+    in preflop
+    '''
+    # variable inits
+    in_bounds = set()
+    suits = {'c', 'd', 'h', 's'}
+    opp = {('c', 'd'), ('c', 'h'), ('c', 's'), ('d', 'c'), ('d', 'h'), ('d', 's'),
+           ('h', 'c'), ('h', 'd'), ('h', 's'), ('s', 'c'), ('s', 'd'), ('s', 'h')}
+    pairs = list(itertools.combinations(suits, 2))
+    card_combos = buckets[key]
+
+    # actual code
+    for card in card_combos:
+        num1, num2, o_or_s = card[0], card[1], card[2]
+        if num1 == num2:
+            for pair in pairs:  # pairs, 6
+                in_bounds.add(
+                    (eval7.Card(num1+pair[0]), eval7.Card(num2+pair[1])))
+        else:
+            if o_or_s == "s":
+                for suit in suits:  # suited, 4
+                    in_bounds.add(
+                        (eval7.Card(num1+suit), eval7.Card(num2+suit)))
+            else:
+                for tup in opp:  # opposite, 12
+                    in_bounds.add(
+                        (eval7.Card(num1+tup[0]), eval7.Card(num2+tup[1])))
+    return in_bounds
+
+def assignTopPair(hole, community):
+    '''
+    from yesterday's pdf
+    if called, alters the opponents hold cards 
+    by assigning the best pair that can be created with given community cards
+    if no such pair exists because all cards of max rank, e.x. Ace, are already in community/our hand, returns None
+    similar parameters to calc_strenght function, ex.
+    hole = ['2d', 'Th']
+    community = ['4c', '5s', 'Kc']
+    '''
+    deck = eval7.Deck()
+    hole_cards = [eval7.Card(card) for card in hole]
+    community_cards = [eval7.Card(card) for card in community]
+    remove_cards = hole_cards + community_cards
+    for card in remove_cards:
+        deck.cards.remove(card)  # remove hole and community cards
+
+    # find highest community card
+    hash = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8,
+            '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
+    max_rank = ('2', 2)
+    for c in community:
+        rank = c[0]
+        if hash[rank] > max_rank[1]:
+            max_rank = (rank, hash[rank])
+    print(max_rank)
+
+    # tries to assign hole card
+    new_opp_hand = None
+    suits = ['c', 'd', 'h', 's']
+    while not suits:
+        suitIndex = random.randint(0, len(suits) - 1)
+        suit = suits[suitIndex]
+        suits.pop(suitIndex)
+        card = max_rank[0] + suit
+        if eval7.Card(card) in deck:  # if one exists, create new hand
+            new_opp_hand = []
+            new_opp_hand.append(card)  # max rank
+            deck.cards.remove(eval7.Card(card))
+            deck.shuffle()
+            new_opp_hand.append(str(deck[0]))  # random card
+            break
+    return new_opp_hand
+
+def assignNutCard(hole, community):
+    '''
+    from yesterday's pdf
+    if called, alters the opponents hold cards 
+    by assigning the best nuts that can be created with given community cards
+    similar parameters to calc_strenght function, ex.
+    hole = ['2d', 'Th']
+    community = ['4c', '5s', 'Kc']
+    TODO: I have code for flop community and non-flop (>3 cards). When flop, the code considers best 5 hand combo
+    of 2 hole and 3 flop
+    When non-flop, the code considers best 5 hand combo of 1 hole and 4 community cards
+    Because the pdf paper only consider one hole card but for flop round, idk what to do (there wouldn't be 5 cards)
+    '''
+    deck = eval7.Deck()
+    hole_cards = [eval7.Card(card) for card in hole]
+    community_cards = [eval7.Card(card) for card in community]
+    remove_cards = hole_cards + community_cards
+    for card in remove_cards:
+        deck.cards.remove(card)  # remove hole and community cards
+
+    best_nuts = (None, 0)
+
+    if len(community) == 3:  # flop
+        possible_holes = list(itertools.combinations(deck, 2))
+        possible_communities = list(itertools.combinations(community_cards, 3))
+        for hole in possible_holes:
+            for rest in possible_communities:
+                if eval7.evaluate(hole+rest) > best_nuts[1]:
+                    best_nuts = ([str(hole[0]), str(hole[1])],
+                                 eval7.evaluate(hole+rest))
+    else:
+        possible_communities = list(itertools.combinations(community_cards, 4))
+        # if len(possible_communities) > 500: #trying to limit the time
+        #     possible_communities = possible_communities[:500]
+        for opp_hole_card in deck:  # 50ish
+            for rest in possible_communities:  # 1000ish
+                if eval7.evaluate([opp_hole_card]+list(rest)) > best_nuts[1]:
+                    second_hole = None
+                    while not second_hole:
+                        deck.shuffle()
+                        this = deck.deal(1)[0]
+                        if this != opp_hole_card:
+                            second_hole = this
+                    print([opp_hole_card]+list(rest))  # best hand
+                    best_nuts = ([str(opp_hole_card), str(second_hole)],
+                                 eval7.evaluate([opp_hole_card]+list(rest)))
+    return best_nuts
 
 class Player(Bot):
     '''
@@ -24,6 +196,216 @@ class Player(Bot):
         Returns:
         Nothing.
         '''
+        self.unnormalized_vec_preflop = [0, 0, 0]     # [call/check, raise < 6, raise > 6]
+        self.unnormalized_vec_postflop = [0, 0, 0]    # [fold, call/check, raise]
+
+    def calc_strength_pre_flop(self, hole, iters, action):
+        
+        # updating the vector
+        self.unnormalized_vec_preflop[action] += 1
+
+        # if we haven't collected enough data
+        if sum(self.unnormalized_vec_preflop) < 100:
+            return self.calc_strength(hole, iters)
+
+        normalized_vec_preflop = [i/sum(self.unnormalized_vec_preflop) for i in self.unnormalized_vec_preflop]
+
+        # find ranges
+        # m0, m1, m2, m3
+        # call/check in range m0 - m1, raise <6 in range m1 - m2, raise >6 in range m2 - m3
+
+        # prefix sums
+        pref_forwards = probabilities[:]      # used to find ranges for RAISE > 6
+        pref_backwards = probabilities[:]     # used to find ranges for CALL/CHECK
+
+        for i in range(1, len(pref_forwards)):
+            pref_forwards[i] = pref_forwards[i-1] + pref_forwards[i]
+
+        for i in range(len(pref_backwards)-2, -1, -1):
+            pref_backwards[i] = pref_backwards[i+1] + pref_backwards[i]
+
+        # find range for RAISE > 6
+        m3 = 1
+        m2 = 9
+        for i in range(len(pref_forwards)):
+            if pref_forwards[i] > normalized_vec_preflop[2]:
+                m2 = i
+                break
+
+        # find range for CALL/CHECK
+        m0 = 9
+        m1 = 1
+        for i in range(len(pref_backwards)-1, -1, -1):
+            if pref_backwards[i] > normalized_vec_preflop[0]:
+                m1 = i
+                break
+
+        # range for RAISE < 6 would be m1 - m2
+
+        deck = eval7.Deck()  
+        hole_cards = [eval7.Card(card) for card in hole]
+
+        for card in hole_cards:  # removing our hole cards from the deck
+            deck.cards.remove(card)
+
+        possible_holes = set()
+
+        if action == 0:
+            # range to consider is m1 - m0
+            for i in range(m1, m0+1):
+                possible_holes.union(generate_set(i))
+
+        elif action == 1:
+            # range to consider is m2 - m1
+            for i in range(m2, m1+1):
+                possible_holes.union(generate_set(i))
+
+        else:
+            # range to consider is m3 - m2
+            for i in range(m3, m2+1):
+                possible_holes.union(generate_set(i))
+            
+        # the score is the number of times we win, tie, or lose
+        score = 0
+
+        for _ in range(iters):  # MC the probability of winning
+            deck.shuffle()
+
+            print(possible_holes)
+            opp_hole = random.choice(list(possible_holes))
+
+            _COMM = 5 
+
+            alt_community = deck.peek(_COMM )
+            # the community cards that we draw in the MC
+
+            our_hand = hole_cards + alt_community
+            opp_hand = opp_hole + alt_community
+
+            our_hand_value = eval7.evaluate(our_hand)
+            opp_hand_value = eval7.evaluate(opp_hand)
+
+            if our_hand_value > opp_hand_value:
+                score += 2
+            if our_hand_value == opp_hand_value:
+                score += 1
+            else:
+                score += 0
+
+        hand_strength = score/(2*iters)  # win probability
+
+        return hand_strength
+        
+    def calc_strength_post_flop(self, hole, iters, community = [], action=0):
+        
+        # updating the vector
+        # action = 0 -> fold, action = 1 -> call/check, action = 2 -> raise, action = 3 -> opp didn't take action
+
+        # only updating if opp took action
+        if action < 3:
+            self.unnormalized_vec_postflop[action] += 1
+
+        # if we haven't collected enough data
+        if sum(self.unnormalized_vec_preflop) < 100:
+            return self.calc_strength(hole, iters, community)
+
+        normalized_vec_postflop = [i/sum(self.unnormalized_vec_postflop) for i in self.unnormalized_vec_postflop]
+
+        deck = eval7.Deck() # deck of cards
+        hole_cards = [eval7.Card(card) for card in hole] # our hole cards in eval7 friendly format
+
+        # If the community cards are not empty, we need to remove them from the deck
+        # because we don't want to draw them again in the MC
+        if community != []:
+            community_cards = [eval7.Card(card) for card in community]
+            for card in community_cards: #removing the current community cards from the deck
+                deck.cards.remove(card)
+
+        for card in hole_cards: #removing our hole cards from the deck
+            deck.cards.remove(card)
+        
+        #the score is the number of times we win, tie, or lose
+        score = 0 
+        f = normalized_vec_postflop[0]
+
+        for _ in range(iters): # MC the probability of winning
+            pTop = 0
+            pNut = 0
+            if f < 1/3:
+                pTop = 3 * f**2
+                pNut = 0
+            elif  f >= 1/3 and f < 2/3:
+                pTop = 1/3
+                pNut = (1/3)*(3*f-1)**2
+            else: #f >= 2/3
+                pTop = 1/3
+                pNut = f - 1/3
+
+            r = random.random()
+            if r < pTop:
+                # assign top pair
+                opp_hole = self.assignTopPair(hole, community)
+                opp_hole = [eval7.Card(card) for card in opp_hole]
+
+                for card in opp_hole: #removing the guessed opp hand cards from the deck
+                    deck.cards.remove(card)
+
+            elif r > 1 - pNut:
+                # assign the nut pair
+                opp_hole = self.assignNutCard(hole, community)
+                opp_hole = [eval7.Card(card) for card in opp_hole]
+
+                for card in opp_hole: #removing the guessed opp hand cards from the deck
+                    deck.cards.remove(card)
+
+            else:
+                deck.shuffle()
+                opp_hole = deck.peek(2)
+
+                for card in opp_hole: #removing the guessed opp hand cards from the deck
+                    deck.cards.remove(card)
+
+            deck.shuffle()
+
+            #Let's see how many community cards we still need to draw
+            if len(community) >= 5: #red river case
+                #check the last community card to see if it is red
+                if community[-1][1] == 'h' or community[-1][1] == 'd':
+                    _COMM = 1
+                else:
+                    _COMM = 0
+            else:
+                _COMM = 5 - len(community) # number of community cards we need to draw 
+
+            alt_community = deck.peek(_COMM)  
+
+            if community == []: # if there are no community cards, we only need to compare our hand to the opp hand
+                our_hand = hole_cards  + alt_community 
+                opp_hand = opp_hole  + alt_community
+            else: 
+
+                our_hand = hole_cards + community_cards + alt_community
+                opp_hand = opp_hole + community_cards + alt_community
+
+
+            our_hand_value = eval7.evaluate(our_hand)
+            opp_hand_value = eval7.evaluate(opp_hand)
+
+            if our_hand_value > opp_hand_value:
+                score += 2 
+
+            if our_hand_value == opp_hand_value:
+                score += 1 
+            else: 
+                score += 0    
+
+            for card in opp_hole: # adding the guessed opp hand cards back to the deck
+                deck.cards.add(card)
+
+        hand_strength = score/(2*iters) # win probability 
+
+        return hand_strength
+    
         
     def calc_strength(self, hole, iters, community = []):
         ''' 
@@ -129,7 +511,10 @@ class Player(Bot):
         street = previous_state.street  # 0, 3, 4, or 5 representing when this round ended
         my_cards = previous_state.hands[active]  # your cards
         opp_cards = previous_state.hands[1-active]  # opponent's cards or [] if not revealed
-        
+
+        # adding fold counter
+        if opp_cards == []:
+            self.unnormalized_vec_postflop[0] += 1
 
     def get_action(self, game_state, round_state, active):
         '''
@@ -182,15 +567,40 @@ class Player(Bot):
         else:
             temp_action = FoldAction() 
 
-        _MONTE_CARLO_ITERS = 100
-        
-        #running monte carlo simulation when we have community cards vs when we don't 
-        if street <3:
-            strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS)
-        else:
-            strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS, board_cards)
+        _MONTE_CARLO_ITERS = 500
 
-        
+        # running monte carlo simulation pre-flop
+        if street < 3:
+            # If pre-flop, we are first ones:
+            if my_contribution == 1:
+                strength = self.calc_strength(my_cards, _MONTE_CARLO_ITERS)
+
+            # if opp_contribution - my_contribution > 0, we know that opp just raised
+
+            # if opp raised to more than 6
+            elif opp_contribution - my_contribution > 0 and opp_contribution >= 6:
+                strength = self.calc_strength_pre_flop(my_cards, _MONTE_CARLO_ITERS, 2)
+            
+            # if opp raised to less than 6
+            elif opp_contribution - my_contribution > 0:
+                strength = self.calc_strength_pre_flop(my_cards, _MONTE_CARLO_ITERS, 1)
+
+            # if opp called
+            else:
+                strength = self.calc_strength_pre_flop(my_cards, _MONTE_CARLO_ITERS, 0)
+
+        else:
+            # If we are the first ones:
+            if my_pip == 0 and opp_pip == 0:
+                strength = self.calc_strength_post_flop(my_cards, _MONTE_CARLO_ITERS, board_cards, action=3)
+
+            # if opp_contribution - my_contribution > 0, we know that opp just raised
+            elif opp_contribution - my_contribution > 0:
+                strength = self.calc_strength_post_flop(my_cards, _MONTE_CARLO_ITERS, board_cards, action=2)
+            
+            # opp just checked/called
+            else:
+                strength = self.calc_strength_post_flop(my_cards, _MONTE_CARLO_ITERS, board_cards, action=1)
 
         if continue_cost > 0: 
             _SCARY = 0
