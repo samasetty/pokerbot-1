@@ -22,16 +22,16 @@ buckets = {1: {"AAo", "KKo", "QQo", "JJo", "AKs"},
            8: {"J7s", "96s", "85s", "74s", "42s", "32s", "A9o", "K9o", "Q9o", "J8o", "T8o", "87o", "76o", "65o", "54o"},
            9: {'A3o', '53o', 'T5s', '83o', 'K3o', '63s', '97o', 'J5o', '95o', 'Q3o', 'A8o', 'J4o', 'J3s', 'T5o', 'Q4o', 'K4o', '73o', 'K6o', 'T4s', 'T4o', '95s', '94o', 'T2s', 'J7o', 'Q5o', '96o', 'A4o', 'J3o', 'Q6o', 'Q7o', '52s', '83s', '92s', 'A6o', '82s', 'J6s', '64o', 'K2o', '93s', 'A5o', '62s', 'K5o', '72o', '63o', '72s', '52o', '73s', '92o', 'T7o', '75o', 'Q8o', '82o', 'T3s', '84s', 'T2o', 'J2s', '85o', 'A7o', 'J2o', '74o', 'Q5s', 'Q4s', 'Q6s', '62o', 'A2o', 'Q2s', '86o', 'J6o', 'J4s', 'T3o', 'T6s', '94s', 'T6o', '84o', 'Q7s', '43o', '32o', 'K8o', 'J5s', 'Q2o', '93o', 'Q3s', '65s', '42o', 'K7o'}
            }
+probabilities = {1: 14/663, 
+                2: 15/663, 
+                3: 17/663, 
+                4: 25/663,
+                5: 47/663,
+                6: 34/663,
+                7: 51/663,
+                8: 66/663,
+                9: 394/663}
 #probabilities of a random hand being in each bucket
-# 1: 14/663
-# 2: 15/663
-# 3: 17/663
-# 4: 25
-# 5: 47
-# 6: 34
-# 7: 51
-# 8: 66
-# 9: 394
 
 def parse_hold(hole):
     '''
@@ -141,7 +141,7 @@ def assignNutCard(hole, community):
     similar parameters to calc_strenght function, ex.
     hole = ['2d', 'Th']
     community = ['4c', '5s', 'Kc']
-    NOTE: I have code for flop community and non-flop (>3 cards). When flop, the code considers best 5 hand combo
+    TODO: I have code for flop community and non-flop (>3 cards). When flop, the code considers best 5 hand combo
     of 2 hole and 3 flop
     When non-flop, the code considers best 5 hand combo of 1 hole and 4 community cards
     Because the pdf paper only consider one hole card but for flop round, idk what to do (there wouldn't be 5 cards)
@@ -179,6 +179,79 @@ def assignNutCard(hole, community):
                     print([opp_hole_card]+list(rest)) #best hand
                     best_nuts = ([str(opp_hole_card), str(second_hole)], eval7.evaluate([opp_hole_card]+list(rest)))
     return best_nuts
+
+def calc_strength_preflop(hole, iters, opp_f_c_r=[1/3,1/3,1/3]):
+        ''' 
+        Adding opp_f_c_r with assumption that it already exists
+
+        Using MC with iterations to evalute preflop hand strength 
+        Args: 
+        hole - our hole carsd 
+        iters - number of times we run MC 
+        opp_f_c_r - (f,c,r) tuple
+        '''
+        deck = eval7.Deck()  
+        hole_cards = [eval7.Card(card) for card in hole]
+
+        for card in hole_cards:  # removing our hole cards from the deck
+            deck.cards.remove(card)
+
+        #**************************************************************
+        #NEW CODE: estimate best_hole_hands
+        best_bound = 1 #TODO best possible bucket value (need to change, depends on the opponent's move)
+        
+        raise_prob = opp_f_c_r[2] #ex. the player only raises in 9% of the cases
+        worst_bound = 1
+        best_cards = probabilities[1]
+        while raise_prob > best_cards:
+            worst_bound += 1
+            best_cards += probabilities[worst_bound]
+        
+        possible_holes = {}
+        index = 0
+        for key in range(best_bound, worst_bound+1):
+            set_cards = generate_set(key)
+            for opp_hand in set_cards:
+                possible_holes[index] = opp_hand
+                index += 1
+        print("possible_holes, ", len(possible_holes))
+        #**************************************************************
+
+        # the score is the number of times we win, tie, or lose
+        score = 0
+        length = len(possible_holes)
+
+        for _ in range(iters):  # MC the probability of winning
+            deck.shuffle()
+
+            #**************************************************************
+            #NEW CODE
+            rand = random.randint(0, length-1)
+            opp_hole = list(possible_holes[rand])
+            #**************************************************************
+
+            _COMM = 5 
+
+            alt_community = deck.peek(_COMM )
+            # the community cards that we draw in the MC
+
+            our_hand = hole_cards + alt_community
+            opp_hand = opp_hole + alt_community
+
+            our_hand_value = eval7.evaluate(our_hand)
+            opp_hand_value = eval7.evaluate(opp_hand)
+
+            if our_hand_value > opp_hand_value:
+                score += 2
+            if our_hand_value == opp_hand_value:
+                score += 1
+            else:
+                score += 0
+
+        hand_strength = score/(2*iters)  # win probability
+
+        return hand_strength
+
 
 class Player(Bot):
     '''
@@ -407,6 +480,11 @@ if __name__ == '__main__':
     deck = eval7.Deck()
     deck.shuffle()
 
+    #Test Calculate_strength_preflrop
+    hole = deck.deal(2)
+    print("hole,", hole)
+    print(calc_strength_preflop([str(hole[0]), str(hole[1])], 100))
+
     # #Test Parse_hold
     # hole = deck.deal(2)
     # hole2 = [eval7.Card('7s'), eval7.Card('8h')]
@@ -414,15 +492,15 @@ if __name__ == '__main__':
     # # print(hole)
     # print(parse_hold(hole2))
 
-    #Test assignTopPair
-    cards = deck.deal(2+3)
-    hole = cards[:2]
-    flop = cards[2:]
-    print(hole, flop)
-    print(assignTopPair(['5s','Ac'], ['Td','Th','Ts']))
+    # #Test assignTopPair
+    # cards = deck.deal(2+3)
+    # hole = cards[:2]
+    # flop = cards[2:]
+    # print(hole, flop)
+    # print(assignTopPair(['5s','Ac'], ['Td','Th','Ts']))
 
-    #Test Nut
-    print(assignNutCard(['5s','Ac'], ['8h','6h','Tc', 'Ah','8s','2c','7c']))
+    # #Test Nut
+    # print(assignNutCard(['5s','Ac'], ['8h','6h','Tc', 'Ah','8s','2c','7c']))
 
     # #Test Generate_set
     # count = 0

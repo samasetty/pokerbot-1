@@ -1,1 +1,24 @@
-[Card("7s"), Card("8h")]
+[Card("Ac"), Card("2s")] [Card("5s"), Card("Tc"), Card("2c")]
+('T', 10)
+['Tc', 'Jh']
+HERE
+[Card("2d"), Card("8h"), Card("6h"), Card("Tc"), Card("Ah")]
+HERE
+[Card("2d"), Card("8h"), Card("6h"), Card("Tc"), Card("8s")]
+HERE
+[Card("2d"), Card("8h"), Card("6h"), Card("Ah"), Card("8s")]
+HERE
+[Card("2d"), Card("8h"), Card("6h"), Card("8s"), Card("2c")]
+HERE
+[Card("2d"), Card("8h"), Card("Tc"), Card("8s"), Card("2c")]
+HERE
+[Card("2d"), Card("8h"), Card("Ah"), Card("8s"), Card("2c")]
+HERE
+[Card("8c"), Card("8h"), Card("6h"), Card("Tc"), Card("8s")]
+HERE
+[Card("8c"), Card("8h"), Card("6h"), Card("Ah"), Card("8s")]
+HERE
+[Card("8c"), Card("8h"), Card("Tc"), Card("Ah"), Card("8s")]
+HERE
+[Card("9s"), Card("8h"), Card("6h"), Card("Tc"), Card("7c")]
+(['9s', '5d'], 67633152)
