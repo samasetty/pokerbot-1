@@ -116,12 +116,11 @@ def assignTopPair(hole, community):
         rank = c[0]
         if hash[rank] > max_rank[1]:
             max_rank = (rank, hash[rank])
-    print(max_rank)
 
     # tries to assign hole card
     new_opp_hand = None
     suits = ['c', 'd', 'h', 's']
-    while not suits:
+    while suits:
         suitIndex = random.randint(0, len(suits) - 1)
         suit = suits[suitIndex]
         suits.pop(suitIndex)
@@ -133,6 +132,7 @@ def assignTopPair(hole, community):
             deck.shuffle()
             new_opp_hand.append(str(deck[0]))  # random card
             break
+
     return new_opp_hand
 
 def assignNutCard(hole, community):
@@ -178,10 +178,9 @@ def assignNutCard(hole, community):
                         this = deck.deal(1)[0]
                         if this != opp_hole_card:
                             second_hole = this
-                    print([opp_hole_card]+list(rest))  # best hand
                     best_nuts = ([str(opp_hole_card), str(second_hole)],
                                  eval7.evaluate([opp_hole_card]+list(rest)))
-    return best_nuts
+    return best_nuts[0]
 
 class Player(Bot):
     '''
@@ -253,17 +252,17 @@ class Player(Bot):
         if action == 0:
             # range to consider is m1 - m0
             for i in range(m1, m0+1):
-                possible_holes.union(generate_set(i))
+                possible_holes = possible_holes.union(generate_set(i))
 
         elif action == 1:
             # range to consider is m2 - m1
             for i in range(m2, m1+1):
-                possible_holes.union(generate_set(i))
+                possible_holes = possible_holes.union(generate_set(i))
 
         else:
             # range to consider is m3 - m2
             for i in range(m3, m2+1):
-                possible_holes.union(generate_set(i))
+                possible_holes = possible_holes.union(generate_set(i))
             
         # the score is the number of times we win, tie, or lose
         score = 0
@@ -271,8 +270,7 @@ class Player(Bot):
         for _ in range(iters):  # MC the probability of winning
             deck.shuffle()
 
-            print(possible_holes)
-            opp_hole = random.choice(list(possible_holes))
+            opp_hole = list(random.choice(list(possible_holes)))
 
             _COMM = 5 
 
@@ -306,7 +304,7 @@ class Player(Bot):
             self.unnormalized_vec_postflop[action] += 1
 
         # if we haven't collected enough data
-        if sum(self.unnormalized_vec_preflop) < 100:
+        if sum(self.unnormalized_vec_postflop) < 100:
             return self.calc_strength(hole, iters, community)
 
         normalized_vec_postflop = [i/sum(self.unnormalized_vec_postflop) for i in self.unnormalized_vec_postflop]
@@ -342,28 +340,23 @@ class Player(Bot):
                 pNut = f - 1/3
 
             r = random.random()
+            opp_hole = None
             if r < pTop:
                 # assign top pair
-                opp_hole = self.assignTopPair(hole, community)
-                opp_hole = [eval7.Card(card) for card in opp_hole]
-
-                for card in opp_hole: #removing the guessed opp hand cards from the deck
-                    deck.cards.remove(card)
+                opp_hole = assignTopPair(hole, community)
 
             elif r > 1 - pNut:
                 # assign the nut pair
-                opp_hole = self.assignNutCard(hole, community)
-                opp_hole = [eval7.Card(card) for card in opp_hole]
+                opp_hole = assignNutCard(hole, community)
 
-                for card in opp_hole: #removing the guessed opp hand cards from the deck
-                    deck.cards.remove(card)
-
-            else:
+            if opp_hole is None:
                 deck.shuffle()
                 opp_hole = deck.peek(2)
+            else:
+                opp_hole = [eval7.Card(card) for card in opp_hole]
 
-                for card in opp_hole: #removing the guessed opp hand cards from the deck
-                    deck.cards.remove(card)
+            for card in opp_hole: #removing the guessed opp hand cards from the deck
+                deck.cards.remove(card)
 
             deck.shuffle()
 
@@ -387,7 +380,6 @@ class Player(Bot):
                 our_hand = hole_cards + community_cards + alt_community
                 opp_hand = opp_hole + community_cards + alt_community
 
-
             our_hand_value = eval7.evaluate(our_hand)
             opp_hand_value = eval7.evaluate(opp_hand)
 
@@ -400,7 +392,7 @@ class Player(Bot):
                 score += 0    
 
             for card in opp_hole: # adding the guessed opp hand cards back to the deck
-                deck.cards.add(card)
+                deck.cards.append(card)
 
         hand_strength = score/(2*iters) # win probability 
 
@@ -567,7 +559,7 @@ class Player(Bot):
         else:
             temp_action = FoldAction() 
 
-        _MONTE_CARLO_ITERS = 500
+        _MONTE_CARLO_ITERS = 100
 
         # running monte carlo simulation pre-flop
         if street < 3:
